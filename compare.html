@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pricing Compare + Shipping Cutter</title>
+  <style>
+    body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; background:#0a0a0a; color:#fff; padding:16px}
+    .grid{display:grid; gap:12px; grid-template-columns:1fr 1fr}
+    input,select,button{padding:10px; border-radius:8px; border:1px solid #222; background:#111; color:#fff; width:100%}
+    .card{background:#111; padding:16px; border:1px solid #222; border-radius:12px}
+    h2{color:#14b8a6}
+    table{width:100%; border-collapse:collapse}
+    td,th{border-bottom:1px solid #222; padding:6px 4px; text-align:left}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+  </style>
+</head>
+<body>
+  <h2>Pricing Comparison (Spreadsheet vs Sliding Scale) + Shipping Cutter</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Inputs</h3>
+      <label>Width (in) <input id="w" type="number" step="0.01" value="25.25"></label>
+      <label>Height (in) <input id="h" type="number" step="0.01" value="34.5"></label>
+      <label>Allowance (in) <input id="a" type="number" step="0.01" value="2"></label>
+      <label>Moulding Width (in) <input id="mw" type="number" step="0.01" value="1"></label>
+      <label>Wholesale PPFT <input id="ppft" type="number" step="0.01" value="3.70"></label>
+      <label>Spreadsheet Fixed Markup × <input id="fx" type="number" step="0.01" value="3.50"></label>
+      <label>Glazing $/sq.in <input id="gr" type="number" step="0.001" value="0.060"></label>
+      <label>Glazing Sheet <select id="gs"><option>32x40</option><option>40x60</option></select></label>
+      <label>Mats Total $ <input id="mats" type="number" step="0.01" value="60"></label>
+      <label>Specials Total $ <input id="spec" type="number" step="0.01" value="25"></label>
+      <label>Labor $ <input id="lab" type="number" step="0.01" value="22.59"></label>
+      <label>Tax % <input id="tax" type="number" step="0.01" value="8"></label>
+      <button onclick="calc()">Calculate</button>
+    </div>
+    <div class="card">
+      <h3>Shipping Cutter</h3>
+      <label>FedEx Max Piece (in) <select id="maxShip"><option value="96">96 (avoid oversize)</option><option value="108">108</option></select></label>
+      <label>Stick Lengths (in, comma) <input id="sticks" value="96,108"></label>
+      <label>Oversize Penalty $ <input id="ospen" type="number" step="1" value="35"></label>
+      <button onclick="cut()">Compute Cut Plan</button>
+      <pre id="ship" class="mono"></pre>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>Results</h3>
+    <div class="grid">
+      <div>
+        <h4>Spreadsheet Model (fixed markup, moulding-only)</h4>
+        <table id="sheet"></table>
+      </div>
+      <div>
+        <h4>Sliding Scale Model (your engine)</h4>
+        <table id="slide"></table>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  import { runCompare } from './compare.js';
+  import { optimizeCuts } from './shipping.js';
+
+  const bands=[
+    {min_ppft:0,max_ppft:0.99,markup:4.6},
+    {min_ppft:1.0,max_ppft:1.49,markup:4.4},
+    {min_ppft:1.5,max_ppft:1.99,markup:4.3},
+    {min_ppft:2.0,max_ppft:2.99,markup:4.1},
+    {min_ppft:3.0,max_ppft:3.99,markup:3.9},
+    {min_ppft:4.0,max_ppft:4.99,markup:3.8},
+    {min_ppft:5.0,max_ppft:6.99,markup:3.6},
+    {min_ppft:7.0,max_ppft:8.99,markup:3.4},
+    {min_ppft:9.0,max_ppft:9.99,markup:3.2},
+    {min_ppft:10.0,max_ppft:9999.99,markup:3.1}
+  ];
+
+  window.calc = () => {
+    const input = {
+      widthIn: Number(document.getElementById('w').value||0),
+      heightIn: Number(document.getElementById('h').value||0),
+      allowanceIn: Number(document.getElementById('a').value||0),
+      mouldingWidthIn: Number(document.getElementById('mw').value||0),
+      ppft: Number(document.getElementById('ppft').value||0),
+      markupFixed: Number(document.getElementById('fx').value||0),
+      glzRate: Number(document.getElementById('gr').value||0),
+      glzSheet: document.getElementById('gs').value,
+      mats: Number(document.getElementById('mats').value||0),
+      specials: Number(document.getElementById('spec').value||0),
+      labor: Number(document.getElementById('lab').value||0),
+      taxPct: Number(document.getElementById('tax').value||0),
+      bands
+    };
+    const {sheet, sliding} = runCompare(input);
+    const fmt = v => (typeof v === 'number') ? `$${v.toFixed(2)}` : v;
+    const rows1 = [
+      ['Two Heights (in)', sheet.details.twoHeights.toFixed(2)],
+      ['Two Widths (in)', sheet.details.twoWidths.toFixed(2)],
+      ['Feet (calc)', sheet.details.feet.toFixed(2)],
+      ['Mould Wholesale', fmt(sheet.mouldWholesale)],
+      ['Mould Retail (fixed ×)', fmt(sheet.mouldRetail)],
+      ['Glazing', fmt(sheet.glazing)],
+      ['Subtotal', fmt(sheet.subtotal)],
+      ['Tax', fmt(sheet.tax)],
+      ['Grand', fmt(sheet.grand)]
+    ];
+    const rows2 = [
+      ['UI', sliding.ui.toFixed(2)],
+      ['Feet', sliding.feet.toFixed(2)],
+      ['Markup ×', sliding.markup.toFixed(2)],
+      ['Mould Wholesale', fmt(sliding.mouldWholesale)],
+      ['Glazing', fmt(sliding.glazing)],
+      ['Subtotal', fmt(sliding.subtotal)],
+      ['Tax', fmt(sliding.tax)],
+      ['Grand', fmt(sliding.grand)]
+    ];
+    document.getElementById('sheet').innerHTML = rows1.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+    document.getElementById('slide').innerHTML = rows2.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  };
+
+  window.cut = () => {
+    const H=Number(document.getElementById('h').value||0);
+    const W=Number(document.getElementById('w').value||0);
+    const MW=Number(document.getElementById('mw').value||0);
+    const twoH = (H*2)+(MW*4)+1;
+    const twoW = (W*2)+(MW*4)+1;
+    const required = twoH+twoW;
+
+    const maxShip = Number(document.getElementById('maxShip').value||96);
+    const sticks = document.getElementById('sticks').value.split(',').map(s=>Number(s.trim())).filter(Boolean);
+    const os = Number(document.getElementById('ospen').value||35);
+
+    const plan = optimizeCuts({requiredInches:required, stickLengthsIn:sticks, maxShipIn:maxShip, oversizePenalty:os});
+    document.getElementById('ship').textContent = JSON.stringify(plan, null, 2);
+  };
+
+  calc(); cut();
+</script>
+</body>
+</html>
