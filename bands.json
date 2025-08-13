@@ -1,0 +1,52 @@
+[
+  {
+    "min_ppft": 0.0,
+    "max_ppft": 0.99,
+    "markup": 4.6
+  },
+  {
+    "min_ppft": 1.0,
+    "max_ppft": 1.49,
+    "markup": 4.4
+  },
+  {
+    "min_ppft": 1.5,
+    "max_ppft": 1.99,
+    "markup": 4.3
+  },
+  {
+    "min_ppft": 2.0,
+    "max_ppft": 2.99,
+    "markup": 4.1
+  },
+  {
+    "min_ppft": 3.0,
+    "max_ppft": 3.99,
+    "markup": 3.9
+  },
+  {
+    "min_ppft": 4.0,
+    "max_ppft": 4.99,
+    "markup": 3.8
+  },
+  {
+    "min_ppft": 5.0,
+    "max_ppft": 6.99,
+    "markup": 3.6
+  },
+  {
+    "min_ppft": 7.0,
+    "max_ppft": 8.99,
+    "markup": 3.4
+  },
+  {
+    "min_ppft": 9.0,
+    "max_ppft": 9.99,
+    "markup": 3.2
+  },
+  {
+    "min_ppft": 10.0,
+    "max_ppft": 9999.99,
+    "markup": 3.1
+  }
+]

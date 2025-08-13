@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jay’s Frames — POS (Powered by Pricing Engine)</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <style>
+    :root{--bg:#0a0a0a;--fg:#fff;--muted:#9ca3af;--teal:#14b8a6;--card:#111;--line:#222}
+    *{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui, -apple-system, Segoe UI, Inter, Roboto, Arial, sans-serif}
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+    label{display:block;font-size:.85rem;color:var(--muted);margin:.5rem 0 .25rem}
+    input,select,button,textarea{width:100%;padding:.75rem;border:1px solid var(--line);border-radius:10px;background:#0c0c0c;color:var(--fg)}
+    .grid{display:grid;gap:10px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .btn{background:var(--teal);color:#002b27;font-weight:700;border:none;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--line);padding:.5rem .25rem;text-align:left}
+    @media (max-width:720px){.g2,.g3{grid-template-columns:1fr}}
+  </style>
+  <script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="./supabase-config.js"></script>
+  <script src="./supabase-client.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row" style="justify-content:space-between">
+      <div style="color:var(--teal);font-weight:800">Jay’s Frames — POS</div>
+      <div class="row"><button class="btn ghost" onclick="signOut()">Sign out</button></div>
+    </div>
+
+    <div class="grid g2">
+      <section class="card">
+        <div class="muted">Customer</div>
+        <div class="grid g2">
+          <div><label>Name</label><input id="custName"></div>
+          <div><label>Phone</label><input id="custPhone"></div>
+          <div><label>Email</label><input id="custEmail"></div>
+          <div><label>Due</label><input id="dueDate" type="date"></div>
+        </div>
+        <div class="grid g2">
+          <div><label>Artwork</label><input id="artDesc" placeholder="Title / description"></div>
+          <div><label>Storage Loc</label><input id="storageLoc" placeholder="Rack / Bin / Slot"></div>
+        </div>
+        <div class="grid g3">
+          <div><label>Width (in)</label><input id="w" type="number" step="0.01" value="25.25"></div>
+          <div><label>Height (in)</label><input id="h" type="number" step="0.01" value="34.5"></div>
+          <div><label>Allowance (in)</label><input id="allow" type="number" step="0.01" value="2"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="muted">Settings</div>
+        <div class="grid g3">
+          <div><label>Tax %</label><input id="taxPct" type="number" value="8"></div>
+          <div><label>Labor $</label><input id="labor" type="number" value="22.59"></div>
+          <div><label>Markup Scope</label><select id="markupScope"><option value="all">All materials</option><option value="moulding">Moulding only</option></select></div>
+          <div><label>Glazing Product</label><input id="glzProduct" value="Museum Glass (Optimum)"></div>
+          <div><label>Glazing Basis</label><select id="glzBasis"><option value="sqin">$/sq.in + sheet min</option><option value="ui">United Inches bands</option></select></div>
+          <div><label>Sheet</label><select id="glzSheet"><option>32x40</option><option>40x60</option></select></div>
+          <div><label>$/sq.in</label><input id="glzRate" type="number" step="0.0001" value="0.06"></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><div>Mouldings (max 3)</div><button class="btn ghost" onclick="addMould()">+ Add</button></div>
+      <table id="mTable"><thead><tr><th>Item #</th><th>PPFT (wh)</th><th>Feet</th><th>Raw $</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><div>Specials</div><button class="btn ghost" onclick="addSpec()">+ Add</button></div>
+      <table id="sTable"><thead><tr><th>Description</th><th>Unit</th><th>Qty</th><th>Total</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <div class="grid g3">
+        <div><div class="muted">UI / Feet</div><div id="dims"></div></div>
+        <div><div class="muted">Markup ×</div><div id="mk"></div></div>
+        <div><div class="muted">Glazing</div><div id="glz"></div></div>
+      </div>
+      <div class="grid g3" style="margin-top:8px">
+        <div><div class="muted">Materials (pre)</div><div id="base"></div></div>
+        <div><div class="muted">Materials (marked)</div><div id="marked"></div></div>
+        <div><div class="muted">Labor</div><div id="laborAmt"></div></div>
+      </div>
+      <div class="grid g3" style="margin-top:8px">
+        <div><div class="muted">Subtotal</div><div id="subtotal"></div></div>
+        <div><div class="muted">Tax</div><div id="tax"></div></div>
+        <div><div class="muted">Grand</div><div id="grand" style="font-weight:800"></div></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" onclick="saveJob()">Save Job</button>
+        <button class="btn ghost" onclick="emailDraft()">Email</button>
+        <button class="btn ghost" onclick="copySms()">SMS</button>
+        <button class="btn ghost" onclick="window.print()">Print / PDF</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Built 2025-08-13 03:33 • Uses pricing.js engine</div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { jobTotals } from './pricing.js';
+
+    const state = {
+      mouldings: [{item:'',ppft:3.70},{item:'',ppft:0},{item:'',ppft:0}],
+      specials: [{descr:'Float Mount Elevated', unit:25, qty:1}],
+      bands: null
+    };
+    async function loadBands(){ const res = await fetch('./bands.json'); state.bands = await res.json(); }
+
+    function uiFeet(){
+      const w=parseFloat(document.getElementById('w').value)||0;
+      const h=parseFloat(document.getElementById('h').value)||0;
+      const a=parseFloat(document.getElementById('allow').value)||0;
+      const ui = 2*(w+h+a), feet = ui/12;
+      return {w,h,a,ui,feet};
+    }
+
+    function renderTables(){
+      const d=uiFeet();
+      const mbody=document.querySelector('#mTable tbody'); mbody.innerHTML='';
+      state.mouldings.forEach((m,i)=>{
+        const raw = (Number(m.ppft||0)*d.feet)||0;
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td><input value="${m.item||''}" onchange="window.__mItem(${i}, this.value)"></td>
+                      <td><input type="number" step="0.01" value="${m.ppft||0}" onchange="window.__mPpft(${i}, this.value)"></td>
+                      <td>${d.feet.toFixed(2)}</td>
+                      <td>$${raw.toFixed(2)}</td>`;
+        mbody.appendChild(tr);
+      });
+      const sbody=document.querySelector('#sTable tbody'); sbody.innerHTML='';
+      state.specials.forEach((s,i)=>{
+        const t=(Number(s.unit||0)*Number(s.qty||0))||0;
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td><input value="${s.descr||''}" onchange="window.__sDescr(${i}, this.value)"></td>
+                      <td><input type="number" step="0.01" value="${s.unit||0}" onchange="window.__sUnit(${i}, this.value)"></td>
+                      <td><input type="number" step="1" value="${s.qty||0}" onchange="window.__sQty(${i}, this.value)"></td>
+                      <td>$${t.toFixed(2)}</td>`;
+        sbody.appendChild(tr);
+      });
+    }
+    window.__mItem=(i,v)=>{ state.mouldings[i].item=v; calc(); };
+    window.__mPpft=(i,v)=>{ state.mouldings[i].ppft=parseFloat(v)||0; calc(); };
+    window.__sDescr=(i,v)=>{ state.specials[i].descr=v; calc(); };
+    window.__sUnit=(i,v)=>{ state.specials[i].unit=parseFloat(v)||0; calc(); };
+    window.__sQty=(i,v)=>{ state.specials[i].qty=parseFloat(v)||0; calc(); };
+
+    window.addMould=()=>{ state.mouldings.push({item:'',ppft:0}); renderTables(); calc(); };
+    window.addSpec =()=>{ state.specials.push({descr:'',unit:0,qty:1}); renderTables(); calc(); };
+
+    function dollars(n){ return '$'+(Number(n||0).toFixed(2)); }
+
+    function calc(){
+      const d=uiFeet();
+      const matsTotal=0; // keep simple; you can extend
+      const specsTotal = state.specials.reduce((a,b)=>a+(Number(b.unit||0)*Number(b.qty||0)),0);
+      const glzBasis=document.getElementById('glzBasis').value;
+      const glzSheet=document.getElementById('glzSheet').value;
+      const glzRate=parseFloat(document.getElementById('glzRate').value)||0;
+
+      const totals = jobTotals({
+        w:d.w, h:d.h, allow:d.a,
+        taxPct: parseFloat(document.getElementById('taxPct').value)||0,
+        labor: parseFloat(document.getElementById('labor').value)||0,
+        mouldings: state.mouldings.map(m=>({ppft: m.ppft})),
+        matsTotal,
+        specialsTotal: specsTotal,
+        glazing: glzBasis==='sqin' ? {mode:'sqin', ratePerSqIn:glzRate, sheet:glzSheet}
+                                   : {mode:'ui', uiBands: []}, // plug bands from Supabase if you track UI
+        bands: state.bands || [],
+        markupScope: document.getElementById('markupScope').value
+      });
+
+      document.getElementById('dims').textContent = d.ui.toFixed(2) + ' UI / ' + d.feet.toFixed(2) + ' ft';
+      document.getElementById('mk').textContent = (totals.markup||0).toFixed(2) + '×';
+      document.getElementById('glz').textContent = dollars(totals.glazingCost);
+      document.getElementById('base').textContent = dollars(totals.base);
+      document.getElementById('marked').textContent = dollars(totals.marked);
+      document.getElementById('laborAmt').textContent = dollars(totals.labor);
+      document.getElementById('subtotal').textContent = dollars(totals.subtotal);
+      document.getElementById('tax').textContent = dollars(totals.tax);
+      document.getElementById('grand').textContent = dollars(totals.grand);
+    }
+
+    // Email/SMS helpers
+    window.emailDraft=()=>{
+      const to=(document.getElementById('custEmail').value||'').trim();
+      const subject=encodeURIComponent("Jay’s Frames — Estimate");
+      const body=encodeURIComponent("Your estimate is " + document.getElementById('grand').textContent + ". Reply to approve.");
+      window.location.href=`mailto:${to}?subject=${subject}&body=${body}`;
+    };
+    window.copySms=()=>{
+      const txt=`Your Jay’s Frames estimate is ${document.getElementById('grand').textContent}. Reply YES to confirm.`;
+      navigator.clipboard.writeText(txt).then(()=>alert('SMS text copied'));
+    };
+
+    // Save to Supabase
+    window.saveJob=async()=>{
+      const payload = collectPayload();
+      try{
+        const saved = await supaSaveJob(payload);
+        alert("Saved job " + saved.id);
+      }catch(e){ alert("Save failed: " + (e.message||e)); }
+    };
+
+    function collectPayload(){
+      const d=uiFeet();
+      return {
+        customer: { name:document.getElementById('custName').value, phone:document.getElementById('custPhone').value, email:document.getElementById('custEmail').value },
+        job: {
+          art_desc: document.getElementById('artDesc').value,
+          storage_loc: document.getElementById('storageLoc').value,
+          width_in: d.w, height_in: d.h, allowance_in: d.a,
+          tax_pct: parseFloat(document.getElementById('taxPct').value)||0,
+          labor: parseFloat(document.getElementById('labor').value)||0,
+          grand: document.getElementById('grand').textContent,
+          due_date: document.getElementById('dueDate').value||null
+        },
+        mouldings: state.mouldings,
+        specials: state.specials
+      };
+    }
+
+    // Init
+    await loadBands();
+    renderTables();
+    ['w','h','allow','taxPct','labor','glzBasis','glzSheet','glzRate','markupScope'].forEach(id=>{
+      document.getElementById(id).addEventListener('input', calc);
+      document.getElementById(id).addEventListener('change', calc);
+    });
+    calc();
+  </script>
+</body>
+</html>
